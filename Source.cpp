@@ -2,9 +2,21 @@
 #include <SFML\Audio.hpp>
 #include <random>
 #include <ctime>
+#include <iostream>
+#include <chrono>
 
 int main()
 {
+	const int RESTART_TIME = 7;
+	int best_score = 0;
+startGame:
+	// bg sound
+	sf::SoundBuffer buffer2;
+	buffer2.loadFromFile("C:\\Users\\ksyut\\Desktop\\sound\\background.wav");
+	sf::Sound sound2;
+	sound2.setBuffer(buffer2);
+	sound2.play();
+	auto start = std::chrono::system_clock::now();
 	sf::RenderWindow window(sf::VideoMode(500, 650), "Doodle Jump", sf::Style::Close); // it can't be resize
 	window.setFramerateLimit(60);
 	sf::Texture backgroundTexture;
@@ -26,23 +38,30 @@ int main()
 	sf::RectangleShape gameoverBackground(sf::Vector2f(500, 650));
 	gameoverBackground.setFillColor(sf::Color::White);
 
+	// game over logic
 	sf::Font font;
 	font.loadFromFile("C:\\Users\\ksyut\\Desktop\\font\\arial.ttf");
 	sf::Text scoreText;
 	scoreText.setFont(font);
-	scoreText.setCharacterSize(50);
+	scoreText.setCharacterSize(20);
 	scoreText.setFillColor(sf::Color::Red);
 	sf::Text gameoverText;
 	gameoverText.setFont(font);
-	gameoverText.setString("Game Over!");
-	gameoverText.setCharacterSize(80);
+	gameoverText.setString("Game Over! \n Restart in seven seconds");
+	gameoverText.setCharacterSize(30);
 	gameoverText.setFillColor(sf::Color::Red);
 
-	// sound
+	// jump sound 
 	sf::SoundBuffer buffer;
 	buffer.loadFromFile("C:\\Users\\ksyut\\Desktop\\sound\\jump.wav");
 	sf::Sound sound;
 	sound.setBuffer(buffer);
+
+	// fall sound 
+	sf::SoundBuffer buffer1;
+	buffer1.loadFromFile("C:\\Users\\ksyut\\Desktop\\sound\\fall.wav");
+	sf::Sound sound1;
+	sound1.setBuffer(buffer1);
 
 	// initialize platforms
 	sf::Vector2u platformPosition[10];
@@ -52,7 +71,6 @@ int main()
 	for (size_t i = 0; i < 10; ++i)
 	{
 		platformPosition[i].x = x(e);
-
 		platformPosition[i].y = y(e);
 	}
 
@@ -96,8 +114,16 @@ int main()
 		// score can't increase in this situation
 		if (playerY == height && dy < (-1.62))
 		{
+			if (score >= 500 && score <= 1500) {
+				backgroundTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\background1.png");
+				playerTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\doodle1.png");
+				platformTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\platform1.png");
+			}
 			score += 1;
-			scoreText.setString("Score: " + std::to_string(score));
+			if (score > best_score) {
+				best_score = score;
+			}
+			scoreText.setString("Score: " + std::to_string(score) + "\n Best score: "+std::to_string(best_score));
 		}
 
 		// player's jump mechanism
@@ -143,6 +169,7 @@ int main()
 		// game over
 		if (playerY > 650)
 		{
+			sound1.play();
 			gameoverText.setPosition(30, 200);
 			scoreText.setPosition(150, 400);
 			goto gameover;
@@ -155,21 +182,35 @@ int main()
 gameover:
 	while (window.isOpen())
 	{
+		start = std::chrono::system_clock::now();
 		sf::Event event;
 		while (window.pollEvent(event))
 		{
 			if (event.type == sf::Event::Closed)
 				window.close();
 		}
+		if (score > best_score) {
+			best_score = score;
+		}
 		window.draw(gameoverBackground);
 		window.draw(gameoverText);
 		window.draw(scoreText);
 		window.display();
+		auto end = std::chrono::system_clock::now();
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		while (elapsed_seconds.count() < RESTART_TIME) {
+			end = std::chrono::system_clock::now();
+			elapsed_seconds = end - start;
+		}
+		goto startGame;
 	}
 	return 0;
 }
 // const window 
 // platform random
-// restart
-// sound game over
+// restart -- done
+// sound game over -- done
 // best score
+// if score == 0 to draw it
+// background sound -- done
+// theme changing
