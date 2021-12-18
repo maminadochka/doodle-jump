@@ -4,52 +4,95 @@
 #include <ctime>
 #include <iostream>
 #include <chrono>
+#include "Source.h"
 
-int main()
-{
-	const int RESTART_TIME = 7;
-	int best_score = 0;
-startGame:
-	// bg sound
-	sf::SoundBuffer buffer2;
-	buffer2.loadFromFile("C:\\Users\\ksyut\\Desktop\\sound\\background.wav");
-	sf::Sound sound2;
-	sound2.setBuffer(buffer2);
-	sound2.play();
-	auto start = std::chrono::system_clock::now();
-	sf::RenderWindow window(sf::VideoMode(500, 650), "Doodle Jump", sf::Style::Close); // it can't be resize
-	window.setFramerateLimit(60);
+using namespace std;
+
+const int WINDOW_HEIGHT = 650;
+const int WINDOW_WIDTH = 500;
+const int PLAYER_LEFT_BOUNDING_BOX = 20;
+const int PLAYER_RIGHT_BOUNDING_BOX = 60;
+const int PLAYER_BOTTOM_BOUNDING_BOX = 70;
+FILE* SCORE_HISTORY_FILE;
+char sch[255];
+int best_score = 0;
+sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Doodle Jump", sf::Style::Close);
+sf::RectangleShape gameoverBackground(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+sf::Text gameoverText;
+sf::Text scoreText;
+sf::Text winText;
+
+int getScoreFromHistory() {
+	FILE* fp;
+	fp = fopen("score_history.txt", "r");
+	char line[1024];
+	while (fgets(line, 1024, fp)) {
+		return stoi(line);
+	};
+}
+
+void gameover(int score, int best_score) {
+	while (window.isOpen())
+	{
+		sf::Event event;
+
+		while (window.pollEvent(event))
+		{
+			if (event.type == sf::Event::Closed)
+				window.close();
+		}
+
+		if (score > best_score)
+		{
+			best_score = score;
+		}
+
+		window.draw(gameoverBackground);
+		window.draw(gameoverText);
+		window.draw(winText);
+		winText.setPosition(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 + WINDOW_HEIGHT / 3);
+		window.draw(scoreText);
+		window.display();
+		if (sf::Keyboard::isKeyPressed(sf::Keyboard::R))
+		{
+			startGame();
+		}
+		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::E))
+		{
+			exit(0);
+		}
+	}
+}
+
+void startGame() {
+	auto start = chrono::system_clock::now();
+	window.setFramerateLimit(70);
 	sf::Texture backgroundTexture;
 	sf::Texture playerTexture;
 	sf::Texture platformTexture;
-	backgroundTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\background.png");
-	playerTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\doodle.png");
-	platformTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\platform.png");
+	backgroundTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\background2.png");
+	playerTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\doodle2.png");
+	platformTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\platform2.png");
 	sf::Sprite background(backgroundTexture);
 	sf::Sprite player(playerTexture);
 	sf::Sprite platform(platformTexture);
-	/*
-	*      ----Size of images----
-	*    background.png size: 500 * 700
-	*    doodle.png     size:  80 *  80
-	*    platform.png   size:  68 *  14
-	*/
 
-	sf::RectangleShape gameoverBackground(sf::Vector2f(500, 650));
 	gameoverBackground.setFillColor(sf::Color::White);
 
 	// game over logic
 	sf::Font font;
 	font.loadFromFile("C:\\Users\\ksyut\\Desktop\\font\\arial.ttf");
-	sf::Text scoreText;
+	winText.setFont(font);
+	winText.setCharacterSize(20);
+	winText.setFillColor(sf::Color::Black);
 	scoreText.setFont(font);
 	scoreText.setCharacterSize(20);
-	scoreText.setFillColor(sf::Color::Red);
-	sf::Text gameoverText;
+	scoreText.setPosition(WINDOW_WIDTH - 150, WINDOW_HEIGHT - 630);
+	scoreText.setFillColor(sf::Color::Magenta);
 	gameoverText.setFont(font);
-	gameoverText.setString("Game Over! \n Restart in seven seconds");
+	gameoverText.setString("\t\t\t\tGame Over!\n\n\nPress R to start new game\nPress E to exit");
 	gameoverText.setCharacterSize(30);
-	gameoverText.setFillColor(sf::Color::Red);
+	gameoverText.setFillColor(sf::Color::Black);
 
 	// jump sound 
 	sf::SoundBuffer buffer;
@@ -65,9 +108,10 @@ startGame:
 
 	// initialize platforms
 	sf::Vector2u platformPosition[10];
-	std::uniform_int_distribution<unsigned> x(0, 500 - platformTexture.getSize().x);
-	std::uniform_int_distribution<unsigned> y(100, 650);
-	std::default_random_engine e(time(0));
+	uniform_int_distribution<unsigned> x(0, WINDOW_WIDTH - platformTexture.getSize().x);
+	uniform_int_distribution<unsigned> y(10, WINDOW_HEIGHT);
+	default_random_engine e(time(0));
+
 	for (size_t i = 0; i < 10; ++i)
 	{
 		platformPosition[i].x = x(e);
@@ -82,9 +126,6 @@ startGame:
 	int score = 0;
 
 	// player's bounding box. It should modify according to the image size
-	const int PLAYER_LEFT_BOUNDING_BOX = 20;
-	const int PLAYER_RIGHT_BOUNDING_BOX = 60;
-	const int PLAYER_BOTTOM_BOUNDING_BOX = 70;
 
 	while (window.isOpen())
 	{
@@ -94,6 +135,7 @@ startGame:
 			if (event.type == sf::Event::Closed)
 				window.close();
 		}
+		scoreText.setString("Score: " + to_string(score) + "\nBest score: " + to_string(best_score));
 
 		if (sf::Keyboard::isKeyPressed(sf::Keyboard::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
 			playerX -= 4;
@@ -101,29 +143,20 @@ startGame:
 			playerX += 4;
 
 		// player out of boundary and change the side
-		// I don't know why   if (playerX > window.getSize().x)   doesn't work. so I use 500 instead of window.getSize().x
-		// the second if :  if (playerX < -40)   use -40 because window.getSize().x is unsigned int, it can't be negative
-		// -40 is (playerTexture x size) / 2
-		if (playerX > 500)
+		if (playerX > WINDOW_WIDTH)
 			playerX = 0;
-		if (playerX < -40)
-			playerX = window.getSize().x - playerTexture.getSize().x;
+		if (playerX < 0)
+			playerX = WINDOW_WIDTH;
 
 		// score
-		// dy = -1.60001 is terminal velocity that player stand on the platform and don't go up anymore
-		// score can't increase in this situation
-		if (playerY == height && dy < (-1.62))
+		if (playerY == height && dy < (-3))
 		{
-			if (score >= 500 && score <= 1500) {
-				backgroundTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\background1.png");
-				playerTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\doodle1.png");
-				platformTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\platform1.png");
-			}
 			score += 1;
 			if (score > best_score) {
 				best_score = score;
 			}
-			scoreText.setString("Score: " + std::to_string(score) + "\n Best score: "+std::to_string(best_score));
+
+			scoreText.setString("Score: " + to_string(score) + "\nBest score: " + to_string(best_score));
 		}
 
 		// player's jump mechanism
@@ -131,28 +164,32 @@ startGame:
 		playerY += dy;
 
 		if (playerY < height)
+		{
 			for (size_t i = 0; i < 10; ++i)
 			{
 				playerY = height;
 				platformPosition[i].y -= dy;  // vertical translation
-				if (platformPosition[i].y > 650) // set new platform on the top
+
+				if (platformPosition[i].y > WINDOW_HEIGHT) // set new platform on the top
 				{
 					platformPosition[i].y = 0;
 					platformPosition[i].x = x(e);
 				}
-
 			}
+		}
+
 		// detect jump on the platform
 		for (size_t i = 0; i < 10; ++i)
 		{
-			if ((playerX + PLAYER_RIGHT_BOUNDING_BOX > platformPosition[i].x) && (playerX + PLAYER_LEFT_BOUNDING_BOX < platformPosition[i].x + platformTexture.getSize().x)        // player's horizontal range can touch the platform
-				&& (playerY + PLAYER_BOTTOM_BOUNDING_BOX > platformPosition[i].y) && (playerY + PLAYER_BOTTOM_BOUNDING_BOX < platformPosition[i].y + platformTexture.getSize().y)  // player's vertical   range can touch the platform
+			if ((playerX + PLAYER_RIGHT_BOUNDING_BOX > platformPosition[i].x) &&
+				(playerX + PLAYER_LEFT_BOUNDING_BOX < platformPosition[i].x + platformTexture.getSize().x)        // player's horizontal range can touch the platform
+				&& (playerY + PLAYER_BOTTOM_BOUNDING_BOX > platformPosition[i].y) &&
+				(playerY + PLAYER_BOTTOM_BOUNDING_BOX < platformPosition[i].y + platformTexture.getSize().y)  // player's vertical   range can touch the platform
 				&& (dy > 0)) // player is falling
 			{
 				sound.play();
 				dy = -10;
 			}
-
 		}
 		player.setPosition(playerX, playerY);
 
@@ -167,50 +204,45 @@ startGame:
 		}
 
 		// game over
-		if (playerY > 650)
+		if (playerY > WINDOW_HEIGHT)
 		{
 			sound1.play();
 			gameoverText.setPosition(30, 200);
 			scoreText.setPosition(150, 400);
-			goto gameover;
+			if (getScoreFromHistory() < score) {
+				winText.setString("you have new best score");
+				//	window.draw(winText);
+			}
+			else {
+				winText.setString("previous score was better!");
+			};
+			SCORE_HISTORY_FILE = fopen("score_history.txt", "wb+");
+			if (SCORE_HISTORY_FILE == NULL) {
+				cout << "Error opening score history file";
+				exit(2);
+			}
+			fprintf(SCORE_HISTORY_FILE, "%d\n", score);
+			gameover(score, best_score);
 		}
 		window.draw(scoreText);
 		window.display();
 	}
+}
+
+
+int main()
+{
+	// bg sound
+	sf::SoundBuffer buffer2;
+	buffer2.loadFromFile("C:\\Users\\ksyut\\Desktop\\sound\\background.wav");
+	sf::Sound sound2;
+	sound2.setBuffer(buffer2);
+	sound2.play();
 
 	// Game Over
-gameover:
-	while (window.isOpen())
-	{
-		start = std::chrono::system_clock::now();
-		sf::Event event;
-		while (window.pollEvent(event))
-		{
-			if (event.type == sf::Event::Closed)
-				window.close();
-		}
-		if (score > best_score) {
-			best_score = score;
-		}
-		window.draw(gameoverBackground);
-		window.draw(gameoverText);
-		window.draw(scoreText);
-		window.display();
-		auto end = std::chrono::system_clock::now();
-		std::chrono::duration<double> elapsed_seconds = end - start;
-		while (elapsed_seconds.count() < RESTART_TIME) {
-			end = std::chrono::system_clock::now();
-			elapsed_seconds = end - start;
-		}
-		goto startGame;
-	}
+	startGame();
 	return 0;
 }
-// const window 
-// platform random
-// restart -- done
-// sound game over -- done
-// best score
-// if score == 0 to draw it
-// background sound -- done
-// theme changing
+
+
+// change path
