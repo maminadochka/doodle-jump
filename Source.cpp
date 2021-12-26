@@ -5,23 +5,30 @@
 #include <iostream>
 #include <chrono>
 #include "Source.h"
+#include "Graphics.h"
 
 using namespace std;
 
-const int WINDOW_HEIGHT = 650;
-const int WINDOW_WIDTH = 500;
-const int PLAYER_LEFT_BOUNDING_BOX = 20;
-const int PLAYER_RIGHT_BOUNDING_BOX = 60;
-const int PLAYER_BOTTOM_BOUNDING_BOX = 70;
 FILE* SCORE_HISTORY_FILE;
 char sch[255];
 int best_score = 0;
 sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Doodle Jump", sf::Style::Close);
 sf::RectangleShape gameoverBackground(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
+sf::RectangleShape startScreenBackground(sf::Vector2f(WINDOW_WIDTH, WINDOW_HEIGHT));
 sf::Text gameoverText;
 sf::Text scoreText;
 sf::Text winText;
 sf::Text lvlText;
+
+// texture load from file + texture set to object
+sf::RectangleShape initObject(string textureFilePath, sf::Vector2f obj_size) {
+	sf::RectangleShape game_object;
+	sf::Texture game_texture;
+	game_texture.loadFromFile(textureFilePath);
+	game_object.setSize(obj_size);
+	game_object.setTexture(&game_texture);
+	return game_object;
+}
 
 int getScoreFromHistory() {
 	FILE* fp;
@@ -30,6 +37,31 @@ int getScoreFromHistory() {
 	while (fgets(line, 1024, fp)) {
 		return stoi(line);
 	};
+	fclose(fp);
+}
+
+sf::Text cookTextObject(sf::Font font, string message, sf::Color color) {
+	sf::Text text;
+	text.setFont(font);
+	text.setCharacterSize(20);
+	text.setFillColor(color);
+	text.setString(message);
+	return text;
+}
+
+bool detectJump(int playerX, int playerY, sf::Vector2u platformPosition, sf::Texture platformTexture, int dy) {
+	if ((playerX + PLAYER_RIGHT_BOUNDING_BOX > platformPosition.x) &&
+		(playerX + PLAYER_LEFT_BOUNDING_BOX < platformPosition.x
+			+ platformTexture.getSize().x)        // player's horizontal range can touch the platform
+		&& (playerY + PLAYER_BOTTOM_BOUNDING_BOX > platformPosition.y) &&
+		(playerY + PLAYER_BOTTOM_BOUNDING_BOX < platformPosition.y
+			+ platformTexture.getSize().y)  // player's vertical   range can touch the platform
+		&& (dy > 0)) {
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 void gameover(int score, int best_score) {
@@ -48,6 +80,7 @@ void gameover(int score, int best_score) {
 			best_score = score;
 		}
 
+		gameoverBackground.setFillColor(sf::Color::White);
 		window.draw(gameoverBackground);
 		window.draw(gameoverText);
 		window.draw(winText);
@@ -65,31 +98,65 @@ void gameover(int score, int best_score) {
 	}
 }
 
+void startScreen() {
+	sf::Font font;
+	font.loadFromFile("font\\arial.ttf");
+	sf::Text startText;
+	startText.setFont(font);
+	startText.setCharacterSize(40);
+	startText.setFillColor(sf::Color::Black);
+	startText.setPosition(WINDOW_WIDTH - 450, WINDOW_HEIGHT - 100);
+	sf::Texture startScreenTexture;
+	startScreenTexture.loadFromFile("images\\startScreen.png");
+	sf::Sprite background(startScreenTexture);
+	startText.setString("Press enter to start");
+	window.draw(background);
+	window.draw(startText);
+	window.display();
+	while (window.isOpen()) {
+		sf::Event event;
+
+		while (window.pollEvent(event))
+		{
+			if (event.type == sf::Event::Closed)
+				window.close();
+		}
+		if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter)) {
+			startGame();
+		}
+	}
+}
+
 void startGame() {
 	auto start = chrono::system_clock::now();
 	window.setFramerateLimit(70);
-	sf::RectangleShape blackHole(sf::Vector2f(80, 82));
+	sf::CircleShape blackHole;
 	sf::Texture backgroundTexture;
 	sf::Texture playerTexture;
 	sf::Texture platformTexture;
-	sf::Texture blackHoleTexture;
-	backgroundTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\background.png");
-	playerTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\doodle.png");
-	platformTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\platform.png");
-	blackHoleTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\hole.png");
-	blackHole.setTexture(&blackHoleTexture);
+	//sf::Texture blackHoleTexture;
+	backgroundTexture.loadFromFile("images\\background.png");
+	playerTexture.loadFromFile("images\\doodle.png");
+	platformTexture.loadFromFile("images\\platform.png");
+	//blackHoleTexture.loadFromFile("images\\hole.png");
+	//blackHole.setScale(2, 1.50);
+	//blackHole.setTexture(&blackHoleTexture);
+	//sf::RectangleShape blackHole = initObject("images\\hole.png", sf::Vector2f(80, 82));
+	blackHole.setRadius(30);
+	blackHole.setFillColor(sf::Color::Black);
 	sf::Sprite background(backgroundTexture);
 	sf::Sprite player(playerTexture);
 	sf::Sprite platform(platformTexture);
 
-	gameoverBackground.setFillColor(sf::Color::White);
 
 	// text
 	sf::Font font;
-	font.loadFromFile("C:\\Users\\ksyut\\Desktop\\font\\arial.ttf");
+	font.loadFromFile("font\\arial.ttf");
+	//winText = cookTextObject(font, "", sf::Color::Black);
 	winText.setFont(font);
 	winText.setCharacterSize(20);
 	winText.setFillColor(sf::Color::Black);
+	//scoreText = cookTextObject(font, "", sf::Color::Magenta);
 	scoreText.setFont(font);
 	scoreText.setCharacterSize(20);
 	scoreText.setPosition(WINDOW_WIDTH - 170, WINDOW_HEIGHT - 630);
@@ -104,18 +171,19 @@ void startGame() {
 
 	// jump sound 
 	sf::SoundBuffer buffer;
-	buffer.loadFromFile("C:\\Users\\ksyut\\Desktop\\sound\\jump.wav");
+	buffer.loadFromFile("sound\\jump.wav");
 	sf::Sound sound;
 	sound.setBuffer(buffer);
 
 	// fall sound 
 	sf::SoundBuffer buffer1;
-	buffer1.loadFromFile("C:\\Users\\ksyut\\Desktop\\sound\\fall.wav");
+	buffer1.loadFromFile("sound\\fall.wav");
 	sf::Sound sound1;
 	sound1.setBuffer(buffer1);
 
 	// initialize platforms
 	sf::Vector2u platformPosition[10];
+	sf::Vector2u blackHolePosition[10];
 	uniform_int_distribution<unsigned> x(0, WINDOW_WIDTH - platformTexture.getSize().x);
 	uniform_int_distribution<unsigned> y(10, WINDOW_HEIGHT);
 	default_random_engine e(time(0));
@@ -124,6 +192,10 @@ void startGame() {
 	{
 		platformPosition[i].x = x(e);
 		platformPosition[i].y = y(e);
+	}
+	for (size_t i = 0; i < WINDOW_WIDTH / blackHole.getGlobalBounds().width + 1; ++i) {
+		blackHolePosition[i].x = x(e);
+		blackHolePosition[i].y = y(e);
 	}
 
 	// player's positon and down velocity
@@ -170,9 +242,9 @@ void startGame() {
 			score += 1;
 			if (score > 200 && lvl == 1) {
 				if (hasLoadedFile == false) {
-					backgroundTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\background1.png");
-					playerTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\doodle1.png");
-					platformTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\platform1.png");
+					backgroundTexture.loadFromFile("images\\background1.png");
+					playerTexture.loadFromFile("images\\doodle1.png");
+					platformTexture.loadFromFile("images\\platform1.png");
 					hasLoadedFile = true;
 					lvl++;
 					lvlText.setString("Level " + to_string(lvl));
@@ -181,9 +253,9 @@ void startGame() {
 
 			if (score >= 400 && lvl == 2) {
 				if (hasLoadedFile2 == false) {
-					backgroundTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\background2.png");
-					playerTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\doodle2.png");
-					platformTexture.loadFromFile("C:\\Users\\ksyut\\Desktop\\images\\platform2.png");
+					backgroundTexture.loadFromFile("images\\background2.png");
+					playerTexture.loadFromFile("images\\doodle2.png");
+					platformTexture.loadFromFile("images\\platform2.png");
 					hasLoadedFile = true;
 					lvl++;
 					lvlText.setString("Level " + to_string(lvl));
@@ -219,13 +291,7 @@ void startGame() {
 		// detect jump on the platform
 		for (size_t i = 0; i < WINDOW_WIDTH/platformTexture.getSize().x+1; ++i)
 		{
-			if ((playerX + PLAYER_RIGHT_BOUNDING_BOX > platformPosition[i].x) &&
-				(playerX + PLAYER_LEFT_BOUNDING_BOX < platformPosition[i].x 
-					+ platformTexture.getSize().x)        // player's horizontal range can touch the platform
-				&& (playerY + PLAYER_BOTTOM_BOUNDING_BOX > platformPosition[i].y) &&
-				(playerY + PLAYER_BOTTOM_BOUNDING_BOX < platformPosition[i].y 
-					+ platformTexture.getSize().y)  // player's vertical   range can touch the platform
-				&& (dy > 0)) // player is falling
+			if (detectJump(playerX, playerY, platformPosition[i], platformTexture, dy)) // player is falling
 			{
 				sound.play();
 				dy = -10;
@@ -242,7 +308,7 @@ void startGame() {
 			if ((sf::FloatRect(playerX + PLAYER_LEFT_BOUNDING_BOX, playerY + 5, 6, 6).intersects(blackHole.getGlobalBounds()))) {
 				gameoverText.setPosition(30, 200);
 				scoreText.setPosition(150, 400);
-				if (getScoreFromHistory() < score) {
+				if (getScoreFromHistory() < best_score) {
 					winText.setString("you have new best score");
 					//	window.draw(winText);
 				}
@@ -254,7 +320,11 @@ void startGame() {
 					cout << "Error opening score history file";
 					exit(2);
 				}
-				fprintf(SCORE_HISTORY_FILE, "%d\n", score); 
+				fprintf(SCORE_HISTORY_FILE, "%d\n", best_score); 
+				fclose(SCORE_HISTORY_FILE);
+				sf::sleep(sf::milliseconds(300));
+				sound1.play();
+				best_score = getScoreFromHistory();
 				gameover(score, best_score);
 			}
 		}
@@ -265,9 +335,10 @@ void startGame() {
 		{
 			platform.setPosition(platformPosition[i].x, platformPosition[i].y);
 			window.draw(platform);
-
 		}
-		blackHole.setPosition(platformPosition[2].x, platformPosition[2].y);
+		//for (size_t i = 0; i < WINDOW_WIDTH / blackHole.getGlobalBounds().width; ++i) {
+		blackHole.setPosition(platformPosition[5].x + 10, platformPosition[5].y + 10);
+		//}
 		window.draw(blackHole);
 
 		// game over
@@ -276,7 +347,7 @@ void startGame() {
 			sound1.play();
 			gameoverText.setPosition(30, 200);
 			scoreText.setPosition(150, 400);
-			if (getScoreFromHistory() < score) {
+			if (getScoreFromHistory() < best_score) {
 				winText.setString("you have new best score");
 				//	window.draw(winText);
 			}
@@ -288,30 +359,32 @@ void startGame() {
 				cout << "Error opening score history file";
 				exit(2);
 			}
-			fprintf(SCORE_HISTORY_FILE, "%d\n", score);
+			fprintf(SCORE_HISTORY_FILE, "%d\n", best_score);
+			fclose(SCORE_HISTORY_FILE);
+			best_score = getScoreFromHistory();
 			gameover(score, best_score);
 		}
 		window.draw(scoreText);
-		window.draw(lvlText);
+		//window.draw(lvlText);
 		window.display();
 	}
 }
 
 int main()
 {
+	startScreen();
 	// bg sound
 	sf::SoundBuffer buffer2;
-	buffer2.loadFromFile("C:\\Users\\ksyut\\Desktop\\sound\\background.wav");
+	buffer2.loadFromFile("sound\\background.wav");
 	sf::Sound sound2;
 	sound2.setBuffer(buffer2);
 	sound2.play();
 	sound2.setLoop(true);
-
-	startGame();
 	return 0;
 }
 
-// change path to const
-// black hole photo
+// start menu
 // file score 
 // modules
+// сделать реже черные дыры и подкорректировать
+// pruzhina (увеличивать dy)
