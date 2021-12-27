@@ -148,7 +148,6 @@ void startGame() {
 	sf::Sprite player(playerTexture);
 	sf::Sprite platform(platformTexture);
 
-
 	// text
 	sf::Font font;
 	font.loadFromFile("font\\arial.ttf");
@@ -365,14 +364,13 @@ void startGame() {
 			gameover(score, best_score);
 		}
 		window.draw(scoreText);
-		//window.draw(lvlText);
+		window.draw(lvlText);
 		window.display();
 	}
 }
 
 int main()
 {
-	startScreen();
 	// bg sound
 	sf::SoundBuffer buffer2;
 	buffer2.loadFromFile("sound\\background.wav");
@@ -380,11 +378,6 @@ int main()
 	sound2.setBuffer(buffer2);
 	sound2.play();
 	sound2.setLoop(true);
+	startScreen();
 	return 0;
 }
-
-// start menu
-// file score 
-// modules
-// сделать реже черные дыры и подкорректировать
-// pruzhina (увеличивать dy)
